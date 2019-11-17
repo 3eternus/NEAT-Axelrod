@@ -5,11 +5,23 @@ import neat
 import visualize
 import numpy as np
 import matplotlib.pyplot as plt
+import os, glob
+import datetime
+import pickle 
 
+current_dir = os.path.dirname(os.path.abspath(__file__))
+date_str = datetime.datetime.now().strftime("%d-%m-%Y--%H.%M.%S")
+checkpoints_path = os.path.join(current_dir, "checkpoints", date_str + '(spatial)') 
+plots_path = os.path.join(current_dir, "plots", date_str + '(spatial)') 
+summaries_path = os.path.join(current_dir, "summaries", date_str + '(spatial)') 
+nodecounts_path = os.path.join(current_dir, "node_counts", date_str + '(spatial)') 
 
-import os
+os.mkdir(checkpoints_path)
+os.mkdir(plots_path)
+os.mkdir(summaries_path)
+os.mkdir(nodecounts_path)
+
 os.environ["PATH"] += os.pathsep + 'C:/Program Files (x86)/Graphviz2.38/bin/'
-
 
 ## Load the configuration file for NEAT library
 
@@ -22,21 +34,26 @@ config = neat.Config(
     filename = CONFIG_FILE
     )
 
+# After how many generations, save the generations
+# If it is set to 0, saving is off
+SAVE_GENERATIONS_INTERVAL = 1
+
+
+## If saving is on, remove old checkpoints
+#if SAVE_GENERATIONS_INTERVAL:
+#        files = glob.glob('checkpoints/*')
+#        for f in files:
+#            os.remove(f)
+
 
 PLOT_ON_CONSOLE = True
 SAVE_PLOTS      = True 
 
 ## How many matches each agent play with each other at one generation
-TOURNAMENT_TURNS = 3
-
+TOURNAMENT_TURNS = 10
 
 # How many generations should the code run
-MAX_GENERATIONS = 5
-
-
-# Integer encoding of Cooperation and Defect actions
-INT_DEFECT = -1
-INT_COOPERATION = 1
+MAX_GENERATIONS =  400
 
 
 # Read input size of network to use it in the code, do not change.
@@ -44,7 +61,7 @@ NEAT_INPUT_SIZE = config.genome_config.num_inputs ## 2
 
 # It should be an even number since it will take last N action of both of the 
 #   agents and total input size will be 2 * N
-assert NEAT_INPUT_SIZE % 2 == 0, 'Input size should not be an odd number.'
+assert NEAT_INPUT_SIZE % 8 == 0, 'Input size should not be an odd number.'
 
 
 
@@ -60,9 +77,9 @@ def action_to_binary(action):
     
     '''
     if action == Action.C:
-        return INT_COOPERATION
+        return 1
     elif action == Action.D:
-        return INT_DEFECT
+        return -1
     else:
         raise Exception('Invalid action type')
 
@@ -100,7 +117,6 @@ def net_output_to_action(net_output):
         return Action.D
     else:
         return Action.C
-    
     
     
 
@@ -177,8 +193,8 @@ class NeatAgent(Player):
 
         
         if len(opponent_history_binary) < NEAT_INPUT_SIZE / 2:
-            opponent_history_binary = [INT_DEFECT] * NEAT_INPUT_SIZE
-            self_history_binary = [INT_DEFECT] * NEAT_INPUT_SIZE
+            opponent_history_binary = [-1] * NEAT_INPUT_SIZE
+            self_history_binary = [-1] * NEAT_INPUT_SIZE
         
         single_history_size = NEAT_INPUT_SIZE // 2
         net_input = opponent_history_binary[-single_history_size:] \
@@ -291,6 +307,15 @@ p.add_reporter(stats)
 
 
 '''
+    Save checkpoints to checkpoints directory. Do not delete the checkpoints directory
+    or it will complain about it can not find the directory.
+'''
+if SAVE_GENERATIONS_INTERVAL > 0:
+    p.add_reporter(neat.Checkpointer(SAVE_GENERATIONS_INTERVAL, 
+                                     filename_prefix=os.path.join(checkpoints_path, 'neat-checkpoint-')))
+
+
+'''
     Run the NEAT algorithm for MAX_GENERATIONS time and select the best performing
     agent from the last generation
 '''
@@ -327,12 +352,12 @@ plt.show()
     Note: Do not delete summaries folder, this saves results in it and complains
      if it can't find the folder.
 '''
-import os, glob
-files = glob.glob('summaries/*')
-for f in files:
-    os.remove(f)
+
+#files = glob.glob('summaries/*')
+#for f in files:
+#    os.remove(f)
 for n, results in enumerate(results_per_generation):
-    results.write_summary('summaries/summary' + str(n) + '.csv')
+    results.write_summary(os.path.join(summaries_path, 'summary' + str(n) + '.csv'))
 
 
 '''
@@ -344,25 +369,40 @@ for n, results in enumerate(results_per_generation):
     Note: Do not delete plots folder, this saves results in it and complains
      if it can't find the folder.
 '''
-if SAVE_PLOTS:
-        files = glob.glob('plots/*')
-        for f in files:
-            os.remove(f)
+#if SAVE_PLOTS:
+#        files = glob.glob('plots/*')
+#        for f in files:
+#            os.remove(f)
     
-for n, results in enumerate(results_per_generation):
-    wins = np.array([summary.Wins for summary in results.summarise()])
-    matches_played = np.array(matches_played_per_player_per_generation[n])
-    
-    win_ratio = wins / matches_played
-    coop_ratio = [summary.Cooperation_rating for summary in results.summarise()]
-    
-    plt.plot(win_ratio, 'ro')
-    plt.plot(coop_ratio, 'b^')
-    plt.xlabel('n_th Individual')
-    plt.ylabel('Win ratio & Cooperation ratio')    
-    plt.legend(('Win ratio', 'Cooperation ratio'))
-    if SAVE_PLOTS:
-        plt.savefig('plots/tournament' + str(n) + '.png')
-    if PLOT_ON_CONSOLE:
-        plt.show()
+# for n, results in enumerate(results_per_generation):
+#     wins = np.array([summary.Wins for summary in results.summarise()])
+#     matches_played = np.array(matches_played_per_player_per_generation[n])
+#
+#     win_ratio = wins / matches_played
+#     coop_ratio = [summary.Cooperation_rating for summary in results.summarise()]
+#
+#     plt.plot(win_ratio, 'ro')
+#     plt.plot(coop_ratio, 'b^')
+#     plt.xlabel('n_th Individual')
+#     plt.ylabel('Win ratio & Cooperation ratio')
+#     plt.legend(('Win ratio', 'Cooperation ratio'))
+#     if SAVE_PLOTS:
+#         plt.savefig(os.path.join(plots_path, 'tournament' + str(n) + '.png'))
+#     if PLOT_ON_CONSOLE:
+#         plt.show()
+
+'''
+    Print and save the count of the nodes
+'''
+
+node_counts = []
+final_genomes =  list(p.population.values())
+for n in range(len(final_genomes)):
+    individual = final_genomes[n]
+    print('There are %d nodes at the %d. individual' % (len(individual.nodes) - 1, n + 1))
+    node_counts.append(len(individual.nodes) - 1)
+
+
+with open(os.path.join(nodecounts_path, 'list'), 'wb') as f:
+    pickle.dump(node_counts, f)
 
