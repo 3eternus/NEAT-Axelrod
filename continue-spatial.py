@@ -6,22 +6,23 @@ import visualize
 import numpy as np
 import matplotlib.pyplot as plt
 import os, glob
-import datetime
+import datetime 
+import re
 import pickle 
 
+
+'Enter the checkpoint file to load here'
+CHECKPOINT_FILE_PATH = "checkpoints/02-08-2019--02.13.02(spatial)/neat-checkpoint-9" #for example 
+
+'Extracts which generation you left'
+LAST_GEN_NUMBER = re.findall('\d+', re.findall('neat-checkpoint-\d+', CHECKPOINT_FILE_PATH)[0])[0] + 1
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
-date_str = datetime.datetime.now().strftime("%d-%m-%Y--%H.%M.%S")
-checkpoints_path = os.path.join(current_dir, "checkpoints", date_str + '(spatial)') 
-plots_path = os.path.join(current_dir, "plots", date_str + '(spatial)') 
-summaries_path = os.path.join(current_dir, "summaries", date_str + '(spatial)') 
+date_str = re.findall('/\d.*\d/', CHECKPOINT_FILE_PATH)[0][1:-1] 
+checkpoints_path = os.path.join(current_dir, "checkpoints", date_str) 
+plots_path = os.path.join(current_dir, "plots", date_str) 
+summaries_path = os.path.join(current_dir, "summaries", date_str) 
 nodecounts_path = os.path.join(current_dir, "node_counts", date_str + '(spatial)') 
-
-os.mkdir(checkpoints_path)
-os.mkdir(plots_path)
-os.mkdir(summaries_path)
-os.mkdir(nodecounts_path)
-
-os.environ["PATH"] += os.pathsep + 'C:/Program Files (x86)/Graphviz2.38/bin/'
 
 ## Load the configuration file for NEAT library
 
@@ -50,10 +51,11 @@ PLOT_ON_CONSOLE = True
 SAVE_PLOTS      = True 
 
 ## How many matches each agent play with each other at one generation
-TOURNAMENT_TURNS = 10
+TOURNAMENT_TURNS = 1
+
 
 # How many generations should the code run
-MAX_GENERATIONS =  400
+MAX_GENERATIONS = 30
 
 
 # Read input size of network to use it in the code, do not change.
@@ -61,7 +63,7 @@ NEAT_INPUT_SIZE = config.genome_config.num_inputs ## 2
 
 # It should be an even number since it will take last N action of both of the 
 #   agents and total input size will be 2 * N
-assert NEAT_INPUT_SIZE % 8 == 0, 'Input size should not be an odd number.'
+assert NEAT_INPUT_SIZE % 2 == 0, 'Input size should not be an odd number.'
 
 
 
@@ -290,9 +292,10 @@ results_per_generation = []
 matches_played_per_player_per_generation = []   
 
 '''
-    Create the population, which is the top-level object for a NEAT run.
+    Load the checkpoint file as population
 '''
-p = neat.Population(config)
+p = neat.Checkpointer.restore_checkpoint(CHECKPOINT_FILE_PATH)
+
 
 '''
     Create a stats object to use for showing fitness per generation graph.
@@ -357,7 +360,7 @@ plt.show()
 #for f in files:
 #    os.remove(f)
 for n, results in enumerate(results_per_generation):
-    results.write_summary(os.path.join(summaries_path, 'summary' + str(n) + '.csv'))
+    results.write_summary(os.path.join(summaries_path, 'summary' + str(LAST_GEN_NUMBER + n) + '.csv'))
 
 
 '''
@@ -387,13 +390,14 @@ for n, results in enumerate(results_per_generation):
 #     plt.ylabel('Win ratio & Cooperation ratio')
 #     plt.legend(('Win ratio', 'Cooperation ratio'))
 #     if SAVE_PLOTS:
-#         plt.savefig(os.path.join(plots_path, 'tournament' + str(n) + '.png'))
+#         plt.savefig(os.path.join(plots_path, 'tournament' + str(LAST_GEN_NUMBER + n) + '.png'))
 #     if PLOT_ON_CONSOLE:
 #         plt.show()
 
 '''
-    Print and save the count of the nodes
+    Print the count of the nodes
 '''
+
 
 node_counts = []
 final_genomes =  list(p.population.values())
